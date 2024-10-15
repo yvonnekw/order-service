@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: order-service
+  config:
+    import: optional:configserver:http://localhost:8888
+    #enabled: true
+
+userService:
+  url: http://localhost:8585
+
+productService:
+  url: http://localhost:8484
+
+# server:
+#   port: 8888
