@@ -38,11 +38,13 @@ public class OrderService {
 
         var order = this.orderRepository.save(orderMapper.toOrder(request));
 
+       // var orderId = order.getOrderId();
+
         for (PurchaseRequest purchaseRequest : request.products()) {
             orderLineService.saveOrderLine(
                     new OrderLineRequest(
                             null,
-                            order.getOrderId(),
+                            //orderId,
                             purchaseRequest.productId(),
                             purchaseRequest.quantity()
                     )
