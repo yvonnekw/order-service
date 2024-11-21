@@ -23,8 +23,8 @@ public class OrderMapper {
                 order.getOrderId(),
                 order.getReference(),
                 order.getTotalAmount(),
-                order.getPaymentMethod(),
-                order.getUserId()
+                order.getPaymentMethod()
+               // order.getUsername()
         );
     }
 }

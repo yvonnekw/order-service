@@ -8,7 +8,7 @@ public record OrderResponse(
         Long orderId,
         String reference,
         BigDecimal totalAmount,
-        PaymentMethod paymentMethod,
-        Long userId
+        PaymentMethod paymentMethod
+       // Long userId
 ) {
 }

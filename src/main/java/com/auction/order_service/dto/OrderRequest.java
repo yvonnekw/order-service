@@ -19,7 +19,7 @@ public record OrderRequest(
         //@NotNull(message = "buyerId should not be a null")
         //@NotEmpty(message = "buyerId should not be empty")
         //@NotBlank(message = "buyerId should not be blank")
-        Long userId,
+        //String userId,
         @NotEmpty(message = "You should at least purchase one product")
         List<PurchaseRequest> products
 

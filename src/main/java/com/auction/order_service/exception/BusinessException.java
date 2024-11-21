@@ -9,7 +9,6 @@ public class BusinessException extends RuntimeException {
     private final String code;
     private final String msg;
 
-
     public BusinessException(String code, String msg) {
         super(msg);
         this.code = code;

@@ -23,16 +23,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final UserClient userClient;
+    //private final UserClient userClient;
     private final ProductClient productClient;
     private final OrderMapper orderMapper;
     private final OrderLineService orderLineService;
     private final OrderRepository orderRepository;
     private final OrderProducer orderProducer;
 
-    public Long createOrder(OrderRequest request) {
-        var buyer = this.userClient.findBuyerById(request.userId())
-                .orElseThrow(() -> new BusinessException("Cannot create order:: No userId exists with id provided " , request.userId().toString()));
+    public Long createOrder(String username, OrderRequest request) {
+        //var buyer = this.userClient.findBuyerByUsername(request.userId())
+        //.orElseThrow(() -> new BusinessException("Cannot create order:: No userId exists with id provided " , request.userId().toString()));
 
         var purchasedProducts = this.productClient.purchaseProducts(request.products());
 
@@ -51,14 +51,12 @@ public class OrderService {
             );
         }
 
-        //todo start payment process
-
         orderProducer.sendOrderOrderConfirmation(
                 new OrderConfirmation(
                        request.reference(),
                         request.totalAmount(),
                         request.paymentMethod(),
-                        buyer,
+                        username,
                         purchasedProducts
                 )
         );
