@@ -7,7 +7,7 @@ public record PurchaseRequest(
         @NotNull(message = "Product is mandatory")
         Long productId,
         @Positive(message = "Quantity is mandatory")
-        double quantity
+        int quantity
 
 ) {
 
