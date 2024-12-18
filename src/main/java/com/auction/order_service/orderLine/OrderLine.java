@@ -19,5 +19,4 @@ public class OrderLine {
     private Order order;
     private Long productId;
     private double quantity;
-
 }
