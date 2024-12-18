@@ -17,10 +17,10 @@ import java.util.List;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-@Service
-@RequiredArgsConstructor
-public class ProductClient {
-
+//@Service
+//@RequiredArgsConstructor
+//public class ProductClient {
+/*
     @Value("${application.config.product-url}")
     private String productUrl;
 
@@ -48,4 +48,6 @@ public class ProductClient {
         }
         return responseEntity.getBody();
     }
-}
+
+    */
+//}
