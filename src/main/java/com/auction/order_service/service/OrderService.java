@@ -38,7 +38,7 @@ public class OrderService {
     public Long processOrderWithPayment(String username, String firstName, String lastName, String email, OrderPaymentRequest request, Long orderId) {
 
         log.info("Processing payment for user: {}", username);
-        PaymentResponse paymentResponse = paymentServiceClient.processPayment(firstName, lastName, email, request);
+        PaymentResponse paymentResponse = paymentServiceClient.processPayment(username, firstName, lastName, email, request);
 
         if (!paymentResponse.isSuccessful()) {
             log.error("Payment failed for user: {}", username);
@@ -103,6 +103,9 @@ public class OrderService {
                         request.getOrderRequest().totalAmount(),
                         request.getOrderRequest().paymentMethod(),
                         username,
+                        firstName,
+                        lastName,
+                        email,
                         purchasedProducts
                 )
         );
@@ -164,6 +167,9 @@ public class OrderService {
                         updatedOrderRequest.totalAmount(),
                         updatedOrderRequest.paymentMethod(),
                         username,
+                        firstName,
+                        lastName,
+                        email,
                         purchasedProducts
                 )
         );
