@@ -4,5 +4,5 @@ public record OrderLineRequest(
         //Long orderLineId,
         Long orderId,
         Long productId,
-        double quantity) {
+        Integer quantity) {
 }
