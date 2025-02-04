@@ -22,7 +22,8 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping("/create-order")
-    public ResponseEntity<Long> createOrder(@RequestHeader("X-Username") String username,
+    public ResponseEntity<Long> createOrder(@RequestHeader("Authorization") String token,
+                                            @RequestHeader("X-Username") String username,
                                             @RequestHeader("X-FirstName") String firstName,
                                             @RequestHeader("X-LastName") String lastName,
                                             @RequestHeader("X-Email") String email,
