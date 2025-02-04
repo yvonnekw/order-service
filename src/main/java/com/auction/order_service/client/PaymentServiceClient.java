@@ -6,6 +6,7 @@ import com.auction.order_service.dto.PaymentRequest;
 import com.auction.order_service.dto.PaymentResponse;
 import com.auction.order_service.model.Order;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentServiceClient {
 
@@ -24,14 +26,15 @@ public class PaymentServiceClient {
     // @Value("${application.config.order-url}")
     //private String orderServiceUrl;
 
-    public PaymentResponse processPayment(String firstName, String lastName, String email, OrderPaymentRequest request) {
+    public PaymentResponse processPayment(String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
         HttpHeaders headers = new HttpHeaders();
-        //headers.set("X-Username", username);
+        headers.set("X-Username", username);
         headers.set("X-FirstName", firstName);
         headers.set("X-LastName", lastName);
         headers.set("X-Email", email);
 
-        HttpEntity<PaymentRequest> entity = new HttpEntity<>(request.getPaymentRequest(), headers);
+        HttpEntity<OrderPaymentRequest> entity = new HttpEntity<>(request, headers);
+        log.info("Processing payment for user in the payment client: {}, {}", username, entity);
 
         return restTemplate.postForObject(paymentServiceUrl + "/process-payment", entity, PaymentResponse.class);
     }
