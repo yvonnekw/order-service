@@ -12,18 +12,20 @@ public class OrderMapper {
     public Order toOrder(OrderRequest request) {
         return Order.builder()
                 //.orderId(request.orderId())
-                .reference(request.reference())
+                .orderReference(request.orderReference())
                 .totalAmount(request.totalAmount())
-                .paymentMethod(request.paymentMethod())
+                .buyer(request.buyerUsername())
+                //.paymentMethod(request.paymentMethod())
                 .build();
     }
 
     public OrderResponse fromOrder(Order order) {
         return new OrderResponse(
                 order.getOrderId(),
-                order.getReference(),
+                order.getOrderReference(),
                 order.getTotalAmount(),
-                order.getPaymentMethod()
+                order.getBuyer()
+               // order.
                // order.getUsername()
         );
     }

@@ -27,6 +27,25 @@ public class OrderController {
                                             @RequestHeader("X-FirstName") String firstName,
                                             @RequestHeader("X-LastName") String lastName,
                                             @RequestHeader("X-Email") String email,
+                                            @RequestBody OrderPaymentRequest request) {
+
+        if (request.getPaymentRequest() == null || request.getOrderRequest() == null) {
+            throw new IllegalArgumentException("Both PaymentRequest and OrderRequest are required.");
+        }
+
+        log.info("Request received: PaymentRequest={}, OrderRequest={}",
+                request.getPaymentRequest(), request.getOrderRequest());
+
+        return ResponseEntity.ok(orderService.createOrder(token, username, firstName, lastName, email, request));
+    }
+
+    /*
+    @PostMapping("/create-order")
+    public ResponseEntity<Long> createOrder(@RequestHeader("Authorization") String token,
+                                            @RequestHeader("X-Username") String username,
+                                            @RequestHeader("X-FirstName") String firstName,
+                                            @RequestHeader("X-LastName") String lastName,
+                                            @RequestHeader("X-Email") String email,
                                             @RequestBody @Valid OrderPaymentRequest request) {
 
         if (request.getPaymentRequest() == null || request.getOrderRequest() == null) {
@@ -36,8 +55,10 @@ public class OrderController {
         log.info("Request received: PaymentRequest={}, OrderRequest={}",
                 request.getPaymentRequest(), request.getOrderRequest());
 
-        return ResponseEntity.ok(orderService.createOrder(username, firstName, lastName, email, request));
+        return ResponseEntity.ok(orderService.createOrder(token, username, firstName, lastName, email, request));
     }
+
+     */
 
 /*
     @PostMapping("/create-order")
@@ -79,7 +100,7 @@ public class OrderController {
     }
 */
     @GetMapping("/get-all-orders")
-    public ResponseEntity<List<OrderResponse>> findAllOrders() {
+    public ResponseEntity<List<OrderResponse>> findAllOrders(@RequestHeader("Authorization") String token) {
         List<OrderResponse> orders = orderService.findAllOrders();
 
         if (orders.isEmpty()) {
@@ -89,7 +110,7 @@ public class OrderController {
     }
 
     @GetMapping("/{order-id}")
-    public ResponseEntity<OrderResponse> findByOrderId(
+    public ResponseEntity<OrderResponse> findByOrderId(@RequestHeader("Authorization") String token,
             @PathVariable("order-id") Long orderId) {
         return ResponseEntity.ok(orderService.findByOrderId(orderId));
     }

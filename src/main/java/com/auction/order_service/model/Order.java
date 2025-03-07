@@ -23,17 +23,17 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long orderId;
-    private String reference;
+    private String orderReference;
     private BigDecimal totalAmount;
-    @Enumerated(EnumType.STRING)
-    private PaymentMethod paymentMethod;
-    private String username;
+    //@Enumerated(EnumType.STRING)
+    //private PaymentMethod paymentMethod;
+    private String buyer;
     @OneToMany(mappedBy = "order")
     private List<OrderLine> orderLines;
     @CreatedDate
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdDate;
     @LastModifiedDate
-    @Column(insertable = false)
+    @Column(nullable = false)
     private LocalDateTime lastModifiedDate;
 }
