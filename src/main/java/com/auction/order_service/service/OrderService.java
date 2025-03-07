@@ -7,15 +7,18 @@ import com.auction.order_service.exception.BusinessException;
 import com.auction.order_service.kafka.OrderConfirmation;
 import com.auction.order_service.kafka.OrderProducer;
 //import com.auction.order_service.product.ProductClient;
-import com.auction.order_service.model.Order;
+import com.auction.order_service.model.PaymentMethod;
 import com.auction.order_service.repository.OrderRepository;
 import com.auction.order_service.service.orderLine.OrderLineService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestHeader;
 
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -35,45 +38,47 @@ public class OrderService {
     private final PaymentServiceClient paymentServiceClient;
     private final ProductServiceClient productServiceClient;
 
-    public Long processOrderWithPayment(String username, String firstName, String lastName, String email, OrderPaymentRequest request, Long orderId) {
+    public Long processOrderWithPayment(@RequestHeader("Authorization") String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request, Long orderId) {
 
         log.info("Processing payment for user: {}", username);
-        PaymentResponse paymentResponse = paymentServiceClient.processPayment(username, firstName, lastName, email, request);
-
+        PaymentResponse paymentResponse = paymentServiceClient.processPayment(token, username, firstName, lastName, email, request);
+        log.info("Raw Payment Service Response: {}", paymentResponse);
         if (!paymentResponse.isSuccessful()) {
             log.error("Payment failed for user: {}", username);
             throw new RuntimeException("Payment failed, order cannot be processed.");
         }
-
 
         log.info("Marking products as purchased...");
         var purchasedProducts = productServiceClient.purchaseProducts(request.getOrderRequest().products());
 
         for (PurchaseRequest purchaseRequest : request.getOrderRequest().products()) {
             Long productId = purchaseRequest.productId();
-            Integer quantity = purchaseRequest.quantity();
+            int quantity = purchaseRequest.quantity();
 
             try {
 
-                productServiceClient.markProductAsBought(productId);
 
                 ProductResponse productResponse = productServiceClient.findProductById(productId);
                 if (productResponse != null && productResponse.quantity() <= 0) {
+                    productServiceClient.markProductAsBought(productId);
                     productServiceClient.updateProduct(new ProductResponse(
                             productResponse.productId(),
-                            productResponse.username(),
-                            productResponse.productName(),
-                            productResponse.brandName(),
-                            productResponse.description(),
-                            productResponse.startingPrice(),
-                            productResponse.buyNowPrice(),
-                            productResponse.colour(),
-                            productResponse.productSize(),
-                            productResponse.quantity(),
-                            false,
-                            productResponse.isSold()
+                            //productResponse.username(),
+                           // username,
+                            //productResponse.productName(),
+                            //productResponse.brandName(),
+                           // productResponse.description(),
+                           // productResponse.startingPrice(),
+                            //productResponse.buyNowPrice(),
+                           // productResponse.colour(),
+                          //  productResponse.productSize(),
+                            //productResponse.quantity(),
+                            quantity,
+                           true,
+                            false
+
                     ));
-                    log.info("Product {} marked as unavailable. Quantity: 0", productResponse.productName());
+                    log.info("Product {} marked as unavailable. Quantity: 0", productResponse.productId());
                 }
 
             } catch (Exception e) {
@@ -99,9 +104,9 @@ public class OrderService {
         log.info("Sending order confirmation...");
         orderProducer.sendOrderOrderConfirmation(
                 new OrderConfirmation(
-                        request.getOrderRequest().reference(),
+                        request.getOrderRequest().orderReference(),
                         request.getOrderRequest().totalAmount(),
-                        request.getOrderRequest().paymentMethod(),
+                        //request.getOrderRequest().paymentMethod(),
                         username,
                         firstName,
                         lastName,
@@ -128,32 +133,42 @@ public class OrderService {
                 .orElseThrow(() -> new EntityNotFoundException(String.format("No order found with the order id provided: %d", orderId)));
     }
 
-    public Long createOrder(String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
+    public Long createOrder(String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
         if (request == null || request.getPaymentRequest() == null || request.getOrderRequest() == null) {
             throw new IllegalArgumentException("OrderPaymentRequest, PaymentRequest, or OrderRequest cannot be null");
         }
 
-        log.info("Creating order for reference: {}", request.getOrderRequest().reference());
-
         String orderReference = generateOrderReference();
+        log.info("Creating order for orderReference: {}", orderReference);
         OrderRequest updatedOrderRequest = new OrderRequest(
                 orderReference,
                 request.getOrderRequest().totalAmount(),
-                request.getOrderRequest().paymentMethod(),
+               // request.getOrderRequest().paymentMethod(),
+                username,
                 request.getOrderRequest().products()
         );
 
-        PaymentRequest paymentRequest = request.getPaymentRequest();
+        //PaymentRequest paymentRequest = request.getPaymentRequest();
 
         List<PurchaseResponse> purchasedProducts;
         try {
             purchasedProducts = productServiceClient.purchaseProducts(updatedOrderRequest.products());
         } catch (Exception e) {
-            throw new BusinessException("Failed to purchase products: " + e.getMessage(), paymentRequest.paymentMethod() );//sort this out
+            throw new BusinessException("Failed to purchase products: " + e.getMessage(), request.getOrderRequest().orderReference());//sort this out
         }
 
         var order = orderRepository.save(orderMapper.toOrder(updatedOrderRequest));
         Long orderId = order.getOrderId();
+
+        PaymentRequest paymentRequest = new PaymentRequest(
+                orderId,
+                orderReference,
+                request.getOrderRequest().totalAmount(),
+                request.getPaymentRequest().paymentMethod(),
+        request.getPaymentRequest().isSuccessful()
+        );
+
+        log.info("paymentRequest info: {}", paymentRequest);
 
         for (PurchaseRequest purchaseRequest : updatedOrderRequest.products()) {
             orderLineService.saveOrderLine(
@@ -165,7 +180,7 @@ public class OrderService {
                 new OrderConfirmation(
                         orderReference,
                         updatedOrderRequest.totalAmount(),
-                        updatedOrderRequest.paymentMethod(),
+                       // updatedOrderRequest.paymentMethod(),
                         username,
                         firstName,
                         lastName,
@@ -174,7 +189,11 @@ public class OrderService {
                 )
         );
 
-        processOrderWithPayment(username, firstName, lastName, email, request, orderId);
+        OrderPaymentRequest newRequest = new OrderPaymentRequest(paymentRequest, updatedOrderRequest);
+        log.info("new object OrderPaymentRequest info: {}", newRequest);
+
+
+        processOrderWithPayment(token, username, firstName, lastName, email, newRequest, orderId);
 
         return orderId;
     }
@@ -187,10 +206,10 @@ public class OrderService {
             throw new IllegalArgumentException("OrderPaymentRequest or OrderRequest cannot be null");
         }
 
-        // Generate a unique order reference
+        // Generate a unique order orderReference
         String orderReference = generateOrderReference();
 
-        // Create a new OrderRequest with the updated reference
+        // Create a new OrderRequest with the updated orderReference
         OrderRequest updatedOrderRequest = new OrderRequest(
                 orderReference,
                 request.getOrderRequest().totalAmount(),
@@ -230,7 +249,7 @@ public class OrderService {
 
         orderProducer.sendOrderOrderConfirmation(
                 new OrderConfirmation(
-                        orderRequest.reference(),
+                        orderRequest.orderReference(),
                         orderRequest.totalAmount(),
                         orderRequest.paymentMethod(),
                         username,
@@ -268,7 +287,7 @@ public class OrderService {
 
         orderProducer.sendOrderOrderConfirmation(
                 new OrderConfirmation(
-                        request.getOrderRequest().reference(),
+                        request.getOrderRequest().orderReference(),
                         request.getOrderRequest().totalAmount(),
                         request.getOrderRequest().paymentMethod(),
                         username,

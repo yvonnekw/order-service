@@ -28,13 +28,11 @@ public class ProductServiceClient {
     @Value("${application.config.product-url}")
     private String productServiceUrl;
 
-    // Method to mark a product as bought via the ProductService
     public void markProductAsBought(Long productId) {
-        String url = productServiceUrl + "/products/{productId}/mark-as-bought";
+        String url = productServiceUrl + "/{productId}/mark-as-bought";
         restTemplate.postForObject(url, null, Void.class, productId);
     }
 
-    // Method to find a product by its ID
     public ProductResponse findProductById(Long productId) {
         String url = productServiceUrl + "/{productId}";
         return restTemplate.getForObject(url, ProductResponse.class, productId);

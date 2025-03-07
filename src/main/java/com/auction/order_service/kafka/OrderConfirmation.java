@@ -9,7 +9,7 @@ import java.util.List;
 public record OrderConfirmation(
         String orderReference,
         BigDecimal totalAmount,
-        PaymentMethod paymentMethod,
+        //PaymentMethod paymentMethod,
         String username,
         String firstName,
         String lastName,

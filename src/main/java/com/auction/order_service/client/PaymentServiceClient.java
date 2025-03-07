@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -26,15 +27,19 @@ public class PaymentServiceClient {
     // @Value("${application.config.order-url}")
     //private String orderServiceUrl;
 
-    public PaymentResponse processPayment(String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
+    public PaymentResponse processPayment(@RequestHeader("Authorization") String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
         HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", token);
         headers.set("X-Username", username);
         headers.set("X-FirstName", firstName);
         headers.set("X-LastName", lastName);
         headers.set("X-Email", email);
 
+        log.info("Payment client from order payment client - PaymentRequest : {} ", request);
+
         HttpEntity<OrderPaymentRequest> entity = new HttpEntity<>(request, headers);
-        log.info("Processing payment for user in the payment client: {}, {}", username, entity);
+        log.info("Processing payment for user in the payment client: {}, {}", username, entity.getBody());
+        log.info("Raw Payment Service Response: {}", entity.getBody());
 
         return restTemplate.postForObject(paymentServiceUrl + "/process-payment", entity, PaymentResponse.class);
     }
