@@ -12,6 +12,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -44,7 +45,7 @@ public class ProductServiceClient {
         restTemplate.put(url, productResponse, productResponse.productId());
     }
 
-    public List<PurchaseResponse> purchaseProducts(List<PurchaseRequest> requestBody) {
+    public List<PurchaseResponse> purchaseProducts(@RequestHeader("Idempotency-Key") String idempotencyKey,  List<PurchaseRequest> requestBody) {
 
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.set(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE);

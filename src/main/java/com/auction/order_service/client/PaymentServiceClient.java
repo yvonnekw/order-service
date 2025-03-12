@@ -27,13 +27,14 @@ public class PaymentServiceClient {
     // @Value("${application.config.order-url}")
     //private String orderServiceUrl;
 
-    public PaymentResponse processPayment(@RequestHeader("Authorization") String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
+    public PaymentResponse processPayment(@RequestHeader("Authorization") String token, String username, String firstName, String lastName, String email, String  idempotencyKey, OrderPaymentRequest request) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", token);
         headers.set("X-Username", username);
         headers.set("X-FirstName", firstName);
         headers.set("X-LastName", lastName);
         headers.set("X-Email", email);
+        headers.set("Idempotency-Key",  idempotencyKey);
 
         log.info("Payment client from order payment client - PaymentRequest : {} ", request);
 
