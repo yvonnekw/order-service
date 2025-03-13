@@ -115,6 +115,11 @@ public class OrderController {
         return ResponseEntity.ok(orderService.findByOrderId(orderId));
     }
 
+    @GetMapping("/username")
+    public ResponseEntity<List<OrderResponse>> findOrdersByUsername(@RequestHeader("Authorization") String token,  @RequestHeader("X-Username") String username) {
+        return ResponseEntity.ok(orderService.findOrdersByUsername(username));
+    }
+
     @GetMapping()
     @ResponseStatus(HttpStatus.OK)
     public String getPayment() {
