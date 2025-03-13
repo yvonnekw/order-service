@@ -7,6 +7,7 @@ import com.auction.order_service.exception.BusinessException;
 import com.auction.order_service.kafka.OrderConfirmation;
 import com.auction.order_service.kafka.OrderProducer;
 //import com.auction.order_service.product.ProductClient;
+import com.auction.order_service.model.Order;
 import com.auction.order_service.model.PaymentMethod;
 import com.auction.order_service.repository.OrderRepository;
 import com.auction.order_service.service.orderLine.OrderLineService;
@@ -14,6 +15,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.math.BigDecimal;
@@ -38,6 +40,7 @@ public class OrderService {
     private final PaymentServiceClient paymentServiceClient;
     private final ProductServiceClient productServiceClient;
 
+    @Transactional
     public Long processOrderWithPayment(@RequestHeader("Authorization") String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request, Long orderId) {
 
         log.info("Processing payment for user: {}", username);
@@ -119,7 +122,22 @@ public class OrderService {
         return orderId;
     }
 
+    /*
+    public List<OrderResponse> findAllOrders() {
+        return orderRepository.findAll()
+                .stream()
+                .map(order -> {
+                    List<ProductPurchaseRequest> purchaseRequests = order.getOrderLines().stream()
+                            .map(orderLine -> new ProductPurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
+                            .collect(Collectors.toList());
+                    List<ProductPurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(purchaseRequests);
+                    return orderMapper.fromOrder(order, purchasedProducts);
+                })
+                .collect(Collectors.toList());
+    }
+*/
 
+@Transactional
     public List<OrderResponse> findAllOrders() {
         return orderRepository.findAll()
                 .stream()
@@ -127,12 +145,14 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public OrderResponse findByOrderId(Long orderId) {
         return orderRepository.findById(orderId)
                 .map(orderMapper::fromOrder)
                 .orElseThrow(() -> new EntityNotFoundException(String.format("No order found with the order id provided: %d", orderId)));
     }
 
+    @Transactional
     public Long createOrder(String token, String username, String firstName, String lastName, String email, OrderPaymentRequest request) {
         if (request == null || request.getPaymentRequest() == null || request.getOrderRequest() == null) {
             throw new IllegalArgumentException("OrderPaymentRequest, PaymentRequest, or OrderRequest cannot be null");
@@ -196,6 +216,19 @@ public class OrderService {
         processOrderWithPayment(token, username, firstName, lastName, email, newRequest, orderId);
 
         return orderId;
+    }
+
+    @Transactional
+    public List<OrderResponse> findOrdersByUsername(String username) {
+        List<Order> orders = orderRepository.findByBuyer(username);
+        return orders.stream()
+                .map(order -> {
+                    List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(order.getOrderLines().stream()
+                            .map(orderLine -> new PurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
+                            .collect(Collectors.toList()));
+                    return orderMapper.fromOrder(order);
+                })
+                .collect(Collectors.toList());
     }
 
 /*
