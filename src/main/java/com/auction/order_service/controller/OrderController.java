@@ -27,6 +27,7 @@ public class OrderController {
                                             @RequestHeader("X-FirstName") String firstName,
                                             @RequestHeader("X-LastName") String lastName,
                                             @RequestHeader("X-Email") String email,
+                                            @RequestHeader("Idempotency-Key") String idempotencyKey,
                                             @RequestBody OrderPaymentRequest request) {
 
         if (request.getPaymentRequest() == null || request.getOrderRequest() == null) {
@@ -36,7 +37,7 @@ public class OrderController {
         log.info("Request received: PaymentRequest={}, OrderRequest={}",
                 request.getPaymentRequest(), request.getOrderRequest());
 
-        return ResponseEntity.ok(orderService.createOrder(token, username, firstName, lastName, email, request));
+        return ResponseEntity.ok(orderService.createOrder(token, username, firstName, lastName, email, idempotencyKey, request));
     }
 
     /*
@@ -100,7 +101,7 @@ public class OrderController {
     }
 */
     @GetMapping("/get-all-orders")
-    public ResponseEntity<List<OrderResponse>> findAllOrders(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<OrderResponse>> findAllOrders(@RequestHeader("Authorization") String token,  @RequestHeader("Idempotency-Key") String idempotencyKey) {
         List<OrderResponse> orders = orderService.findAllOrders();
 
         if (orders.isEmpty()) {
@@ -110,9 +111,14 @@ public class OrderController {
     }
 
     @GetMapping("/{order-id}")
-    public ResponseEntity<OrderResponse> findByOrderId(@RequestHeader("Authorization") String token,
+    public ResponseEntity<OrderResponse> findByOrderId(@RequestHeader("Authorization") String token,  @RequestHeader("Idempotency-Key") String idempotencyKey,
             @PathVariable("order-id") Long orderId) {
-        return ResponseEntity.ok(orderService.findByOrderId(orderId));
+        return ResponseEntity.ok(orderService.findByOrderId(idempotencyKey, orderId));
+    }
+
+    @GetMapping("/username")
+    public ResponseEntity<List<OrderResponse>> findOrdersByUsername(@RequestHeader("Authorization") String token,  @RequestHeader("X-Username") String username,  @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        return ResponseEntity.ok(orderService.findOrdersByUsername(idempotencyKey, username));
     }
 
     @GetMapping()

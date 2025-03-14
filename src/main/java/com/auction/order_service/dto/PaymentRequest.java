@@ -11,8 +11,8 @@ public record PaymentRequest(
         //String paymentMethod,
         //String orderReference
 
-        Long orderId,
-        String orderReference,
+        //Long orderId,
+        //String orderReference,
         BigDecimal amount,
         PaymentMethod paymentMethod,
 
