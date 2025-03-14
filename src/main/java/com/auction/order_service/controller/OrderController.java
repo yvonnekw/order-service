@@ -102,7 +102,7 @@ public class OrderController {
 */
     @GetMapping("/get-all-orders")
     public ResponseEntity<List<OrderResponse>> findAllOrders(@RequestHeader("Authorization") String token,  @RequestHeader("Idempotency-Key") String idempotencyKey) {
-        List<OrderResponse> orders = orderService.findAllOrders(idempotencyKey);
+        List<OrderResponse> orders = orderService.findAllOrders();
 
         if (orders.isEmpty()) {
             return ResponseEntity.noContent().build();

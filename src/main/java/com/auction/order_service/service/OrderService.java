@@ -49,6 +49,8 @@ public class OrderService {
             throw new IllegalArgumentException("OrderPaymentRequest, PaymentRequest, or OrderRequest cannot be null");
         }
 
+        log.info("idempotencyKey ======= : {}", idempotencyKey);
+
         // 🔑 Generate reference for the order
         String orderReference = generateOrderReference();
         log.info("📦 Creating order for orderReference: {}", orderReference);
@@ -269,8 +271,8 @@ public class OrderService {
         return orderId;
     }
 */
-
-    public List<OrderResponse> findAllOrders(String idempotencyKey) {
+@Transactional
+    public List<OrderResponse> findAllOrders() {
         List<Order> orders = orderRepository.findAll();
 
         return orders.stream()
@@ -278,7 +280,7 @@ public class OrderService {
                     List<PurchaseRequest> purchaseRequests = order.getOrderLines().stream()
                             .map(orderLine -> new PurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
                             .collect(Collectors.toList());
-
+                    String idempotencyKey = UUID.randomUUID().toString();
                     List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
 
                     return orderMapper.fromOrder(order, purchasedProducts);
@@ -307,7 +309,7 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
     */
-
+@Transactional
     public OrderResponse findByOrderId(String idempotencyKey, Long orderId) {
         return orderRepository.findById(orderId)
                 .map(order -> {
@@ -345,7 +347,7 @@ public class OrderService {
                 .orElseThrow(() -> new EntityNotFoundException(String.format("No order found with the order id provided: %d", orderId)));
     }
 */
-
+@Transactional
     public List<OrderResponse> findOrdersByUsername(String idempotencyKey, String username) {
         List<Order> orders = orderRepository.findByBuyer(username);
 
