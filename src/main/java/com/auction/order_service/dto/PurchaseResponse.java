@@ -5,10 +5,14 @@ import java.math.BigDecimal;
 public record PurchaseResponse(
         Long productId,
         String productName,
+        String brandName,
         String description,
-
-        BigDecimal price,
-        Integer quantity
+        String colour,
+        String productSize,
+        BigDecimal startingPrice,
+        BigDecimal buyNowPrice,
+        Integer quantity,
+        String productImageUrl
 
 ) {
 
