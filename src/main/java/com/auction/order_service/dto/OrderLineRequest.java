@@ -1,8 +1,18 @@
 package com.auction.order_service.dto;
 
+import java.math.BigDecimal;
+
 public record OrderLineRequest(
         //Long orderLineId,
         Long orderId,
         Long productId,
-        Integer quantity) {
+        Integer quantity,
+        String productName,
+        String brandName,
+        String description,
+        String colour,
+        String productSize,
+        BigDecimal startingPrice,
+        BigDecimal buyNowPrice,
+        String productImageUrl) {
 }

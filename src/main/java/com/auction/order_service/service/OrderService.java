@@ -23,7 +23,9 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -42,6 +44,242 @@ public class OrderService {
     private final PaymentServiceClient paymentServiceClient;
     private final ProductServiceClient productServiceClient;
 
+    @Transactional
+    public Long createOrder(String token, String username, String firstName, String lastName, String email, String idempotencyKey, OrderPaymentRequest request) {
+        if (request == null || request.getPaymentRequest() == null || request.getOrderRequest() == null) {
+            throw new IllegalArgumentException("OrderPaymentRequest, PaymentRequest, or OrderRequest cannot be null");
+        }
+
+        log.info("🧠 Idempotency Key: {}", idempotencyKey);
+
+        // 🔑 Generate reference for the order
+        String orderReference = generateOrderReference();
+        log.info("📦 Creating order with reference: {}", orderReference);
+
+        // 🔄 Build updated OrderRequest
+        OrderRequest updatedOrderRequest = new OrderRequest(
+                orderReference,
+                request.getOrderRequest().totalAmount(),
+                username,
+                request.getOrderRequest().products()
+        );
+
+        // 📥 Attempt product purchase via product-service
+        List<PurchaseResponse> purchasedProducts;
+        try {
+            purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, updatedOrderRequest.products());
+            log.info("✅ Purchased products: {}", purchasedProducts);
+        } catch (Exception e) {
+            log.error("❌ Failed to purchase products: {}", e.getMessage(), e);
+            throw new BusinessException("Failed to purchase products: " + e.getMessage(), updatedOrderRequest.orderReference());
+        }
+
+        // 🗃 Persist Order
+        Order savedOrder = orderRepository.save(orderMapper.toOrder(updatedOrderRequest));
+        orderRepository.flush(); // Ensure orderId is generated
+        Long orderId = savedOrder.getOrderId();
+        log.info("✅ Order persisted with ID: {}", orderId);
+
+        // 💳 Process Payment
+        PaymentRequest paymentRequest = new PaymentRequest(
+                request.getOrderRequest().totalAmount(),
+                request.getPaymentRequest().paymentMethod(),
+                request.getPaymentRequest().isSuccessful()
+        );
+        log.info("💳 PaymentRequest: {}", paymentRequest);
+
+        PaymentResponse paymentResponse = paymentServiceClient.processPayment(
+                token, username, firstName, lastName, email, idempotencyKey, request
+        );
+
+        if (!paymentResponse.isSuccessful()) {
+            log.error("❌ Payment failed for user: {}", username);
+            throw new RuntimeException("Payment failed. Order cannot be completed.");
+        }
+
+        log.info("✅ Payment successful for user: {}", username);
+
+        // 🧾 Save Order Lines using enriched PurchaseResponse data
+        Map<Long, PurchaseResponse> purchaseResponseMap = purchasedProducts.stream()
+                .collect(Collectors.toMap(PurchaseResponse::productId, Function.identity(), (a, b) -> a));
+
+        for (PurchaseRequest purchaseRequest : updatedOrderRequest.products()) {
+            PurchaseResponse responseItem = purchaseResponseMap.get(purchaseRequest.productId());
+
+            if (responseItem != null) {
+                log.info("Saving OrderLine for productId: {}, enriched with PurchaseResponse", responseItem.productId());
+                orderLineService.saveOrderLine(new OrderLineRequest(
+                        orderId,
+                        responseItem.productId(),
+                        purchaseRequest.quantity(), // Always respect quantity from original request
+                        responseItem.productName(),
+                        responseItem.brandName(),
+                        responseItem.description(),
+                        responseItem.colour(),
+                        responseItem.productSize(),
+                        responseItem.startingPrice(),
+                        responseItem.buyNowPrice(),
+                        responseItem.productImageUrl()
+                ));
+            } else {
+                // Fallback scenario (shouldn't happen if product-service is consistent)
+                log.warn("⚠ No PurchaseResponse found for productId: {}. Falling back to request data.", purchaseRequest.productId());
+                orderLineService.saveOrderLine(new OrderLineRequest(
+                        orderId,
+                        purchaseRequest.productId(),
+                        purchaseRequest.quantity(),
+                        purchaseRequest.productName(),
+                        purchaseRequest.brandName(),
+                        purchaseRequest.description(),
+                        purchaseRequest.colour(),
+                        purchaseRequest.productSize(),
+                        purchaseRequest.startingPrice(),
+                        purchaseRequest.buyNowPrice(),
+                        purchaseRequest.productImageUrl()
+                ));
+            }
+        }
+
+        log.info("📄 Order lines successfully saved for orderId: {}", orderId);
+
+        // 📤 Publish Order Confirmation Event
+        orderProducer.sendOrderOrderConfirmation(new OrderConfirmation(
+                orderReference,
+                updatedOrderRequest.totalAmount(),
+                username,
+                firstName,
+                lastName,
+                email,
+                purchasedProducts
+        ));
+        log.info("📬 Order confirmation event sent for reference: {}", orderReference);
+
+        return orderId;
+    }
+
+
+    /*
+    @Transactional
+    public Long createOrder(String token, String username, String firstName, String lastName, String email, String idempotencyKey, OrderPaymentRequest request) {
+        if (request == null || request.getPaymentRequest() == null || request.getOrderRequest() == null) {
+            throw new IllegalArgumentException("OrderPaymentRequest, PaymentRequest, or OrderRequest cannot be null");
+        }
+
+        log.info("idempotencyKey ======= : {}", idempotencyKey);
+
+        // 🔑 Generate reference for the order
+        String orderReference = generateOrderReference();
+        log.info("📦 Creating order for orderReference: {}", orderReference);
+
+        // 🔄 Build updated OrderRequest
+        OrderRequest updatedOrderRequest = new OrderRequest(
+                orderReference,
+                request.getOrderRequest().totalAmount(),
+                username,
+                request.getOrderRequest().products()
+        );
+
+        // 📥 Attempt product purchase via product-service
+        List<PurchaseResponse> purchasedProducts;
+        try {
+            purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, updatedOrderRequest.products());
+            log.info("✅ Purchased products from product-service: {}", purchasedProducts);
+        } catch (Exception e) {
+            log.error("❌ Product purchase failed: {}", e.getMessage());
+            throw new BusinessException("Failed to purchase products: " + e.getMessage(), updatedOrderRequest.orderReference());
+        }
+
+        // 🗃 Save Order
+        Order savedOrder = orderRepository.save(orderMapper.toOrder(updatedOrderRequest));
+        orderRepository.flush(); // Force write for immediate ID
+        Long orderId = savedOrder.getOrderId();
+        log.info("✅ Order persisted with ID: {}", orderId);
+
+        // 💳 Build the PaymentRequest
+        PaymentRequest paymentRequest = new PaymentRequest(
+                request.getOrderRequest().totalAmount(),
+                request.getPaymentRequest().paymentMethod(),
+                request.getPaymentRequest().isSuccessful()
+        );
+        log.info("PaymentRequest: {}", paymentRequest);
+
+        // Call the payment service to process the payment
+        PaymentResponse paymentResponse = paymentServiceClient.processPayment(
+                token,
+                username,
+                firstName,
+                lastName,
+                email,
+                idempotencyKey,
+                request
+        );
+
+        if (!paymentResponse.isSuccessful()) {
+            log.error("❌ Payment failed for user: {}", username);
+            throw new RuntimeException("Payment failed, order cannot be processed.");
+        }
+        log.info("✅ Payment successfully processed for user: {}", username);
+
+        // 🧾 Save Order Lines using PurchaseResponse for product details
+        Map<Long, PurchaseResponse> purchaseResponseMap = purchasedProducts.stream()
+                .collect(Collectors.toMap(PurchaseResponse::productId, Function.identity(), (a, b) -> a));
+
+        for (PurchaseRequest purchaseRequest : updatedOrderRequest.products()) {
+            PurchaseResponse responseItem = purchaseResponseMap.get(purchaseRequest.productId());
+
+            if (responseItem != null) {
+                log.info("Saving OrderLine for productId: {}, found response: {}", purchaseRequest.productId(), responseItem);
+                orderLineService.saveOrderLine(new OrderLineRequest(
+                        orderId,
+                        responseItem.productId(),
+                        purchaseRequest.quantity(), // Keep quantity from PurchaseRequest
+                        responseItem.productName(),
+                        responseItem.brandName(),
+                        responseItem.description(),
+                        responseItem.colour(),
+                        responseItem.productSize(),
+                        responseItem.startingPrice(),
+                        responseItem.buyNowPrice(),
+                        responseItem.productImageUrl()
+                ));
+            } else {
+                log.warn("⚠ No matching PurchaseResponse found for productId {} — orderLine will not have metadata", purchaseRequest.productId());
+                orderLineService.saveOrderLine(new OrderLineRequest(
+                        orderId,
+                        purchaseRequest.productId(),
+                        purchaseRequest.quantity(),
+                        purchaseRequest.productName(),
+                        purchaseRequest.brandName(),
+                        purchaseRequest.description(),
+                        purchaseRequest.colour(),
+                        purchaseRequest.productSize(),
+                        purchaseRequest.startingPrice(),
+                        purchaseRequest.buyNowPrice(),
+                        purchaseRequest.productImageUrl()
+                ));
+            }
+        }
+
+        log.info("📄 Order lines saved for orderId: {}", orderId);
+
+        // 📤 Send Order Confirmation Event
+        orderProducer.sendOrderOrderConfirmation(new OrderConfirmation(
+                orderReference,
+                updatedOrderRequest.totalAmount(),
+                username,
+                firstName,
+                lastName,
+                email,
+                purchasedProducts
+        ));
+        log.info("📬 Order confirmation sent for orderReference: {}", orderReference);
+
+        return orderId;
+    }
+
+*/
+
+    /*
     @Transactional
     public Long createOrder(String token, String username, String firstName, String lastName, String email, String idempotencyKey, OrderPaymentRequest request) {
 
@@ -109,7 +347,18 @@ public class OrderService {
 
         // 🧾 Save Order Lines
         for (PurchaseRequest purchaseRequest : updatedOrderRequest.products()) {
-            orderLineService.saveOrderLine(new OrderLineRequest(orderId, purchaseRequest.productId(), purchaseRequest.quantity()));
+            orderLineService.saveOrderLine(new OrderLineRequest(
+                    orderId,
+                    purchaseRequest.productId(),
+                    purchaseRequest.quantity(),
+                    purchaseRequest.productName(),
+                    purchaseRequest.brandName(),
+                    purchaseRequest.description(),
+                    purchaseRequest.colour(),
+                    purchaseRequest.productSize(),
+                    purchaseRequest.startingPrice(),
+                    purchaseRequest.buyNowPrice(),
+                    purchaseRequest.productImageUrl()));
         }
         log.info("📄 Order lines saved for orderId: {}", orderId);
 
@@ -129,7 +378,7 @@ public class OrderService {
         return orderId;
     }
 
-
+*/
     @Transactional
     public Long processOrderWithPayment(String token, String username, String firstName, String lastName, String email, String idempotencyKey, OrderPaymentRequest request, Long orderId) {
         log.info("📥 Processing payment for user: {}", username);
@@ -168,7 +417,17 @@ public class OrderService {
         // Save order lines only if not saved earlier
         for (PurchaseRequest purchaseRequest : request.getOrderRequest().products()) {
             orderLineService.saveOrderLine(
-                    new OrderLineRequest(orderId, purchaseRequest.productId(), purchaseRequest.quantity())
+                    new OrderLineRequest(orderId,
+                            purchaseRequest.productId(),
+                            purchaseRequest.quantity(),
+                            purchaseRequest.productName(),
+                            purchaseRequest.brandName(),
+                            purchaseRequest.description(),
+                            purchaseRequest.colour(),
+                            purchaseRequest.productSize(),
+                            purchaseRequest.startingPrice(),
+                            purchaseRequest.buyNowPrice(),
+                            purchaseRequest.productImageUrl())
             );
         }
 
@@ -271,6 +530,44 @@ public class OrderService {
         return orderId;
     }
 */
+
+    @Transactional
+    public List<OrderResponse> findAllOrders() {
+        List<Order> orders = orderRepository.findAll();
+
+        return orders.stream()
+                .map(order -> {
+                    List<OrderLineResponse> orderLineResponses = order.getOrderLines().stream()
+                            .map(orderLine -> new OrderLineResponse(
+                                    orderLine.getOrderLineId(),
+                                    orderLine.getProductId(),
+                                    orderLine.getProductName(),
+                                    orderLine.getBrandName(),
+                                    orderLine.getDescription(),
+                                    orderLine.getColour(),
+                                    orderLine.getProductSize(),
+                                    orderLine.getStartingPrice(),
+                                    orderLine.getBuyNowPrice(),
+                                    orderLine.getQuantity(),
+                                    orderLine.getProductImageUrl()
+                            ))
+                            .collect(Collectors.toList());
+
+                    return new OrderResponse(
+                            order.getOrderId(),
+                            order.getOrderReference(),
+                            order.getTotalAmount(),
+                            order.getUsername(),
+                            order.getCreatedDate(),
+                            order.getLastModifiedDate(),
+                            orderLineResponses
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+
+    /*
 @Transactional
     public List<OrderResponse> findAllOrders() {
         List<Order> orders = orderRepository.findAll();
@@ -278,16 +575,26 @@ public class OrderService {
         return orders.stream()
                 .map(order -> {
                     List<PurchaseRequest> purchaseRequests = order.getOrderLines().stream()
-                            .map(orderLine -> new PurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
+                            .map(orderLine -> new PurchaseRequest(
+                                    orderLine.getProductId(),
+                                    orderLine.getQuantity(),
+                                    orderLine.getProductName(),
+                                    orderLine.getBrandName(),
+                                    orderLine.getDescription(),
+                                    orderLine.getColour(),
+                                    orderLine.getProductSize(),
+                                    orderLine.getStartingPrice(),
+                                    orderLine.getBuyNowPrice(),
+                                    orderLine.getProductImageUrl()))
                             .collect(Collectors.toList());
                     String idempotencyKey = UUID.randomUUID().toString();
-                    List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
+                    //List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
 
-                    return orderMapper.fromOrder(order, purchasedProducts);
-                })
-                .collect(Collectors.toList());
+                   // return orderMapper.fromOrder(order);
+               // })
+               // .collect(Collectors.toList());
     }
-
+*/
 /*
     public List<OrderResponse> findAllOrders() {
         return orderRepository.findAll()
@@ -309,17 +616,35 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
     */
-@Transactional
-    public OrderResponse findByOrderId(String idempotencyKey, Long orderId) {
+    @Transactional
+    public OrderResponse findByOrderId(Long orderId) {
         return orderRepository.findById(orderId)
                 .map(order -> {
-                    List<PurchaseRequest> purchaseRequests = order.getOrderLines().stream()
-                            .map(orderLine -> new PurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
+                    List<OrderLineResponse> orderLineResponses = order.getOrderLines().stream()
+                            .map(orderLine -> new OrderLineResponse(
+                                    orderLine.getOrderLineId(),
+                                    orderLine.getProductId(),
+                                    orderLine.getProductName(),
+                                    orderLine.getBrandName(),
+                                    orderLine.getDescription(),
+                                    orderLine.getColour(),
+                                    orderLine.getProductSize(),
+                                    orderLine.getStartingPrice(),
+                                    orderLine.getBuyNowPrice(),
+                                    orderLine.getQuantity(),
+                                    orderLine.getProductImageUrl()
+                            ))
                             .collect(Collectors.toList());
 
-                    List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
-
-                    return orderMapper.fromOrder(order, purchasedProducts);
+                    return new OrderResponse(
+                            order.getOrderId(),
+                            order.getOrderReference(),
+                            order.getTotalAmount(),
+                            order.getUsername(),
+                            order.getCreatedDate(),
+                            order.getLastModifiedDate(),
+                            orderLineResponses
+                    );
                 })
                 .orElseThrow(() -> new EntityNotFoundException(
                         String.format("No order found with the order id provided: %d", orderId)
@@ -347,6 +672,36 @@ public class OrderService {
                 .orElseThrow(() -> new EntityNotFoundException(String.format("No order found with the order id provided: %d", orderId)));
     }
 */
+    public List<OrderResponse> findOrdersByUsername(String username) {
+        List<Order> orders = orderRepository.findByUsername(username);
+
+        return orders.stream()
+                .map(order -> new OrderResponse(
+                        order.getOrderId(),
+                        order.getOrderReference(),
+                        order.getTotalAmount(),
+                        order.getUsername(),
+                        order.getCreatedDate(),
+                        order.getLastModifiedDate(),
+                        order.getOrderLines().stream()
+                                .map(orderLine -> new OrderLineResponse(
+                                        orderLine.getOrderLineId(),
+                                        orderLine.getProductId(),
+                                        orderLine.getProductName(),
+                                        orderLine.getBrandName(),
+                                        orderLine.getDescription(),
+                                        orderLine.getColour(),
+                                        orderLine.getProductSize(),
+                                        orderLine.getStartingPrice(),
+                                        orderLine.getBuyNowPrice(),
+                                        orderLine.getQuantity(),
+                                        orderLine.getProductImageUrl()
+                                )).toList()
+                )).toList();
+    }
+
+
+    /*
 @Transactional
     public List<OrderResponse> findOrdersByUsername(String idempotencyKey, String username) {
         List<Order> orders = orderRepository.findByBuyer(username);
@@ -354,16 +709,27 @@ public class OrderService {
         return orders.stream()
                 .map(order -> {
                     List<PurchaseRequest> purchaseRequests = order.getOrderLines().stream()
-                            .map(orderLine -> new PurchaseRequest(orderLine.getProductId(), orderLine.getQuantity()))
-                            .collect(Collectors.toList());
+                            .map(orderLine -> new PurchaseRequest(
+                                    orderLine.getProductId(),
+                                    orderLine.getQuantity(),
+                                    orderLine.getProductName(),
+                                    orderLine.getBrandName(),
+                                    orderLine.getDescription(),
+                                    orderLine.getColour(),
+                                    orderLine.getProductSize(),
+                                    orderLine.getStartingPrice(),
+                                    orderLine.getBuyNowPrice(),
+                                    orderLine.getProductImageUrl()))
+                            .toList();
 
-                    List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
+                   // List<PurchaseResponse> purchasedProducts = productServiceClient.purchaseProducts(idempotencyKey, purchaseRequests);
 
-                    return orderMapper.fromOrder(order, purchasedProducts);
-                })
-                .collect(Collectors.toList());
+                   // return orderMapper.fromOrder(order);
+                //})
+               // .collect(Collectors.toList());
     }
-
+}
+*/
 
     /*
     public List<OrderResponse> findOrdersByUsername(String username) {

@@ -12,12 +12,14 @@ public record OrderResponse(
         String reference,
         BigDecimal totalAmount,
         String Buyer,
+        LocalDateTime createdDate,
+        LocalDateTime lastModifiedDate,
         //List<OrderLine> orderLines
        // PaymentMethod paymentMethod
        // Long userId
-        List<PurchaseResponse> purchasedProducts,
-        LocalDateTime createdDate,
-        LocalDateTime lastModifiedDate
+        List<OrderLineResponse> orderLineResponse
+        //List<PurchaseResponse> purchasedProducts
+
 ) {
 
 }

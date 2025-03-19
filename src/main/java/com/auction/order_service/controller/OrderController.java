@@ -15,7 +15,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("api/v1/orders")
+@RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
@@ -111,14 +111,14 @@ public class OrderController {
     }
 
     @GetMapping("/{order-id}")
-    public ResponseEntity<OrderResponse> findByOrderId(@RequestHeader("Authorization") String token,  @RequestHeader("Idempotency-Key") String idempotencyKey,
+    public ResponseEntity<OrderResponse> findByOrderId(@RequestHeader("Authorization") String token,
             @PathVariable("order-id") Long orderId) {
-        return ResponseEntity.ok(orderService.findByOrderId(idempotencyKey, orderId));
+        return ResponseEntity.ok(orderService.findByOrderId(orderId));
     }
 
     @GetMapping("/username")
-    public ResponseEntity<List<OrderResponse>> findOrdersByUsername(@RequestHeader("Authorization") String token,  @RequestHeader("X-Username") String username,  @RequestHeader("Idempotency-Key") String idempotencyKey) {
-        return ResponseEntity.ok(orderService.findOrdersByUsername(idempotencyKey, username));
+    public ResponseEntity<List<OrderResponse>> findOrdersByUsername(@RequestHeader("Authorization") String token,  @RequestHeader("X-Username") String username) {
+        return ResponseEntity.ok(orderService.findOrdersByUsername(username));
     }
 
     @GetMapping()
