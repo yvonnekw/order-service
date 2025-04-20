@@ -3,7 +3,6 @@ package com.auction.order_service.dto;
 import java.math.BigDecimal;
 
 public record OrderLineRequest(
-        //Long orderLineId,
         Long orderId,
         Long productId,
         Integer quantity,

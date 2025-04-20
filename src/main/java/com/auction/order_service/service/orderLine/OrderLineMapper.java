@@ -25,21 +25,6 @@ public class OrderLineMapper {
                 .build();
     }
 
-    /*
-    public OrderLine toOrderLine(OrderLineRequest orderLineRequest) {
-        return OrderLine.builder()
-                //.orderLineId(orderLineRequest.orderLineId())
-                .quantity(orderLineRequest.quantity())
-                .order(
-                        Order.builder()
-                                .orderId(orderLineRequest.orderId())
-                                .build()
-                )
-                .productId(orderLineRequest.productId())
-                .build();
-    }
-    */
-
     public OrderLineResponse toOrderLineResponse(OrderLine orderLine) {
         return new OrderLineResponse(
                 orderLine.getOrderLineId(),

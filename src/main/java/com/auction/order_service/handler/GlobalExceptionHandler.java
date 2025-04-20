@@ -40,30 +40,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
     }
-/*
-    @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleBad(BusinessException ex) {
-        return new ErrorResponse("PRODUCT_UNAVAILABLE", ex.getMessage());
-    }
-    */
-/*
-
-
-    @ExceptionHandler(InsufficientFundsException.class)
-    @ResponseStatus(HttpStatus.PAYMENT_REQUIRED)
-    public ErrorResponse handleInsufficientFunds(InsufficientFundsException ex) {
-        return new ErrorResponse("INSUFFICIENT_FUNDS", ex.getMessage());
-    }
-*/
-
-    /*
-    @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handle(BusinessException ex) {
-        return new ErrorResponse("ORDER_NOT_FOUND", ex.getMsg());
-    }
-*/
 
 }
 

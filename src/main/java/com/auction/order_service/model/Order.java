@@ -25,8 +25,6 @@ public class Order {
     private Long orderId;
     private String orderReference;
     private BigDecimal totalAmount;
-    //@Enumerated(EnumType.STRING)
-    //private PaymentMethod paymentMethod;
     private String username;
     @OneToMany(mappedBy = "order")
     private List<OrderLine> orderLines;
