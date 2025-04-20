@@ -15,5 +15,4 @@ public class OrderPaymentRequest {
 
     @Valid
    private OrderRequest orderRequest;
-    //private Long orderId;
 }

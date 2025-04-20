@@ -15,11 +15,9 @@ public class BusinessException extends RuntimeException {
         this.msg = msg;
     }
 
-
     public boolean isProductUnavailable() {
         return "PRODUCT_UNAVAILABLE".equals(code);
     }
-
 
     public boolean isOrderNotFound() {
         return "ORDER_NOT_FOUND".equals(code);
